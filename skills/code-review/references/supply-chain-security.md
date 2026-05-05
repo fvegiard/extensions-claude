@@ -4,14 +4,17 @@ When a PR adds a new dependency or bumps an existing one, review the upstream re
 
 ## Risk-Based Scrutiny Tiers
 
+Release recency is the primary risk signal - even widely-used, established packages can be compromised (e.g., LiteLLM was a popular package with high download counts when it was hijacked). Check when the target version was published before choosing a tier.
+
 **Apply full scrutiny** (all checks below) when:
+- The target version was published less than 7 days ago - regardless of package popularity or age. For PyPI: visit `https://pypi.org/project/<package>/<version>/` and check the "Released" date. For npm: run `npm view <package>@<version> time`. Recent releases have not had time for community vetting, and this is exactly the window supply chain attackers exploit.
 - Adding a dependency not previously used in this project
 - Upgrading a package that was first published less than 6 months ago (check oldest version at `https://pypi.org/project/<package>/#history` or `npm view <package> time | head -3`) or has low weekly downloads (for PyPI: check `https://pypistats.org/packages/<package>` for weekly downloads; for npm: see weekly downloads on the package page at `https://www.npmjs.com/package/<package>`; use <10k on PyPI / <1k on npm as thresholds)
 - The dependency includes native code, install hooks, or system-level access
 
 **Apply standard scrutiny** (limited checks) when:
-- Upgrading widely-used, established packages with high adoption (>=10k weekly downloads on PyPI / >=1k on npm; e.g., pytest, requests, react, lodash)
-- Minor or patch version bumps to packages with a history of regular releases
+- Upgrading to a version that has been published for at least 7 days, from a widely-used, established package with high adoption (>=10k weekly downloads on PyPI / >=1k on npm; e.g., pytest, requests, react, lodash)
+- Minor or patch version bumps to packages with a history of regular releases, where the target version is at least 7 days old
 - **Check only**: downgrades, yanked versions (target or recent versions), and presence of release notes/source tags. If you find downgrades or high-severity signals (yanked versions), immediately switch to full scrutiny and apply all checklist items below. If you find medium-severity signals (missing release notes) without other signals, note them but remain in standard scrutiny unless combined with additional concerns.
 
 ## Checklist
