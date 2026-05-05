@@ -71,7 +71,7 @@ Watch for:
 - Dependencies that could affect existing users
 
 5. **Security and Correctness** (Critical Issues Only — Highest-Value Category)
-This is the reviewer's **highest-value contribution** — where automated review catches things humans miss (71% precision, 81% recall). Invest your attention here. Focus on real security risks, not theoretical ones:
+This is the reviewer's **highest-value contribution** — where automated review catches things humans miss. Invest your attention here. Focus on real security risks, not theoretical ones:
 - Unsanitized user input (e.g., in SQL, shell, or web contexts)
 - Hardcoded secrets or credentials
 - Incorrect use of cryptographic libraries
@@ -84,7 +84,7 @@ This is the reviewer's **highest-value contribution** — where automated review
 **Important**: When evaluating CVEs or security advisories, always check the system clock (`date`) to determine the current year. Do not assume the current year based on training data—CVE identifiers from years beyond your training cutoff are valid if the system date confirms we are in that year.
 
 6. **Testing and Regression Proof** (High-Value Category)
-Testing gaps are another area where automated review consistently adds value (62% precision, 83% recall). If this change adds new components/modules/endpoints or changes user-visible behavior, and the repository has a test infrastructure, there should be tests that prove the behavior.
+Testing gaps are another area where automated review consistently adds value. If this change adds new components/modules/endpoints or changes user-visible behavior, and the repository has a test infrastructure, there should be tests that prove the behavior.
 
 Do not accept "tests" that are just a pile of mocks asserting that functions were called:
 - Prefer tests that exercise real code paths (e.g., parsing, validation, business logic) and assert on outputs/state.
