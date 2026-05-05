@@ -45,8 +45,7 @@ Identify:
 - Functions doing multiple things (violating single responsibility)
 - Complex conditional logic that obscures the core algorithm
 - Code that could be 3 lines instead of 10
-- Poor naming that obscures intent
-- Missing inline documentation for non-obvious logic
+- Only flag documentation gaps for **public API surfaces** (exported functions, classes, modules) that have no docstring at all. Do NOT suggest rewording existing comments, adding explanatory comments to implementation details, or "clarifying" comments that are already present. Inline comments are the author's domain.
 
 3. **Pragmatic Problem Analysis**
 "Theory and practice sometimes clash. Theory loses. Every single time."
@@ -139,8 +138,7 @@ Then provide analysis (skip if 🟢):
 - [src/processor.py, Line B] **Simplification**: These 10 lines can be 3
 - [src/feature.py, Line C] **Pragmatism**: Solving imaginary problem, focus on real issues
 
-**[STYLE NOTES]** (Skip most of these - only mention if it genuinely hurts maintainability)
-- Generally skip style comments. Linters exist for a reason.
+**[STYLE NOTES]** — Do NOT post style, naming, or formatting comments. This includes variable renames, blank-line adjustments, import ordering, PEP 8 cosmetics, and "more descriptive name" suggestions. Linters and formatters own this category. The only exception: a name that is actively *misleading* (makes the reader believe the opposite of what the code does).
 - Do NOT post comments for code that is acceptable or fine. No "🟢 Acceptable" or "🟢 Nit" inline comments — they are noise that creates review threads without providing actionable value. If code is good, just don't comment on it.
 
 **[TESTING GAPS]** (If behavior changed, this is not optional)
