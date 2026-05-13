@@ -89,11 +89,11 @@ from prompt import FILE_REVIEWER_SKILL, format_prompt  # noqa: E402
 logger = get_logger(__name__)
 
 # Maximum total size of all patches combined in the prompt
-MAX_TOTAL_DIFF = 150000
+MAX_TOTAL_DIFF = 100000
 
 # Maximum size for a single file's patch body. Prevents a single huge file
 # (e.g. a regenerated lockfile) from starving smaller files' patches.
-MAX_PER_FILE_PATCH = 12000
+MAX_PER_FILE_PATCH = 8000
 
 # Maximum size for review context to avoid overwhelming the prompt
 # Keeps context under ~7500 tokens (assuming ~4 chars/token average)
