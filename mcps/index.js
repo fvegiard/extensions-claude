@@ -47,6 +47,8 @@ import kagi from "./catalog/kagi.json" with { type: "json" };
 import clickhouse from "./catalog/clickhouse.json" with { type: "json" };
 import mattermost from "./catalog/mattermost.json" with { type: "json" };
 
+export { MCP_FALLBACK_LOGO, MCP_LOGO_IDS, MCP_LOGOS } from "./logos.js";
+
 export const MCP_CATALOG = [
   github,
   slack,
