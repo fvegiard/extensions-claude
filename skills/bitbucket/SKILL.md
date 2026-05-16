@@ -27,7 +27,7 @@ ENCODED_PASS=$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sy
 git remote set-url origin "https://${ENCODED_USER}:${ENCODED_PASS}@bitbucket.org/username/repo.git"
 ```
 
-Atlassian's Bitbucket Cloud docs recommend avoiding long-lived credentials in the remote URL when possible. Their API token examples use either `https://{bitbucket_username}:{api_token}@...` or `https://x-bitbucket-api-token-auth:{api_token}@...`; OpenHands OSS users should only construct those URLs on demand, with proper URL encoding.
+Atlassian's Bitbucket Cloud docs recommend avoiding long-lived credentials in the remote URL when possible. Their API token examples use either `https://{bitbucket_username}:{api_token}@...` or `https://x-bitbucket-api-token-auth:{api_token}@...`; OpenHands users should only construct those URLs on demand, with proper URL encoding.
 
 Here are some instructions for pushing, but ONLY do this if the user asks you to:
 * NEVER push directly to the `main` or `master` branch
