@@ -6,13 +6,18 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def load_json(relative_path: str):
-    return json.loads((ROOT / relative_path).read_text())
+def load_catalog_entries(relative_path: str):
+    entries = []
+    for entry_path in sorted((ROOT / relative_path).glob("*.json")):
+        entry = json.loads(entry_path.read_text())
+        assert entry["id"] == entry_path.stem
+        entries.append(entry)
+    return entries
 
 
 def test_catalog_ids_are_unique_and_automations_reference_existing_mcps():
-    mcps = load_json("mcps/catalog.json")
-    automations = load_json("automations/catalog.json")
+    mcps = load_catalog_entries("mcps/catalog")
+    automations = load_catalog_entries("automations/catalog")
 
     mcp_ids = [entry["id"] for entry in mcps]
     automation_ids = [entry["id"] for entry in automations]
@@ -28,7 +33,7 @@ def test_catalog_ids_are_unique_and_automations_reference_existing_mcps():
 
 
 def test_catalog_entries_have_required_fields():
-    for entry in load_json("mcps/catalog.json"):
+    for entry in load_catalog_entries("mcps/catalog"):
         assert entry["id"]
         assert entry["name"]
         assert entry["description"]
@@ -41,7 +46,7 @@ def test_catalog_entries_have_required_fields():
         else:
             assert entry["template"]["url"].startswith("https://")
 
-    for entry in load_json("automations/catalog.json"):
+    for entry in load_catalog_entries("automations/catalog"):
         assert entry["id"]
         assert entry["name"]
         assert entry["prompt"]

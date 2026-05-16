@@ -25,13 +25,13 @@
       "import": "./automations/index.js",
       "default": "./automations/index.js"
     },
-    "./automations/catalog.json": "./automations/catalog.json",
+    "./automations/catalog/*.json": "./automations/catalog/*.json",
     "./mcps": {
       "types": "./mcps/index.d.ts",
       "import": "./mcps/index.js",
       "default": "./mcps/index.js"
     },
-    "./mcps/catalog.json": "./mcps/catalog.json",
+    "./mcps/catalog/*.json": "./mcps/catalog/*.json",
     "./package.json": "./package.json"
   }
 }
