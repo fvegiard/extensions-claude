@@ -32,7 +32,7 @@
         "label": "Team / Workspace ID",
         "type": "text",
         "placeholder": "T01234567",
-        "helperText": "Find this in Slack under Workspace settings → About this workspace.",
+        "helperText": "Find this in Slack under Workspace settings \u2192 About this workspace.",
         "required": true
       }
     ]
