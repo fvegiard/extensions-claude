@@ -12,6 +12,7 @@
     "code"
   ],
   "popularityRank": 100,
+  "installHint": "Requires Docker because the legacy npm package was deprecated upstream.",
   "template": {
     "kind": "stdio",
     "serverName": "github",
