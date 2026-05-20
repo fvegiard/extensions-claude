@@ -229,20 +229,20 @@ uv pip install -q openhands-sdk openhands-workspace openhands-tools
 import os
 
 from openhands.sdk import Conversation
+from openhands.sdk.workspace import RemoteWorkspace
 from openhands.tools.preset.default import get_default_agent
-from openhands.workspace import OpenHandsCloudWorkspace
 
-# The API key and server URL each have two names depending on the deployment.
+# Session API key and agent server URL are injected by the automation runtime.
 api_key = os.environ.get("SESSION_API_KEY") or os.environ.get("OH_SESSION_API_KEYS_0", "")
-api_url = os.environ.get("RUNTIME_URL") or os.environ.get("OH_INTERNAL_SERVER_URL", "")
+host = os.environ.get("OH_INTERNAL_SERVER_URL", "http://localhost:60000")
 
-# Use OpenHandsCloudWorkspace to connect to your OpenHands Cloud account
-with OpenHandsCloudWorkspace(
-    local_agent_server_mode=True,
-    cloud_api_url=api_url,
-    cloud_api_key=api_key,
+# Use RemoteWorkspace to connect to the sandbox's local agent server
+with RemoteWorkspace(
+    host=host,
+    api_key=api_key,
+    working_dir="/workspace",
 ) as workspace:
-    # Get your configured LLM from OpenHands Cloud
+    # Get your configured LLM from the agent server's persisted settings
     llm = workspace.get_llm()
     
     # Optionally get your stored secrets
@@ -282,7 +282,7 @@ conversation = Conversation(agent=agent, workspace=workspace, delete_on_close=Fa
 conversation = Conversation(agent=agent, workspace=workspace, delete_on_close=True)
 ```
 
-The `OpenHandsCloudWorkspace` also has a `keep_alive` parameter, but in `local_agent_server_mode=True` (used by automations), sandbox lifecycle is managed by the automation service — not the workspace. The automation service defaults to keeping sandboxes alive.
+Sandbox lifecycle in automations is managed entirely by the automation service — not the workspace. The automation service defaults to keeping sandboxes alive.
 
 ---
 
@@ -292,11 +292,11 @@ Your automation script receives these environment variables:
 
 | Variable | Cloud alias | Description |
 |----------|-------------|-------------|
-| `OH_SESSION_API_KEYS_0` | `SESSION_API_KEY` | Session API key for sandbox-scoped settings calls |
-| `OH_INTERNAL_SERVER_URL` | `RUNTIME_URL` | Internal server URL — used as `cloud_api_url` for the workspace |
+| `OH_SESSION_API_KEYS_0` | `SESSION_API_KEY` | Session API key — passed as `api_key` to `RemoteWorkspace` |
+| `OH_INTERNAL_SERVER_URL` | — | Agent server URL — passed as `host` to `RemoteWorkspace` (fallback: `http://localhost:60000`) |
 | `AUTOMATION_EVENT_PAYLOAD` | — | JSON with trigger info, automation ID, and name |
 
-> **Note:** `OH_*` names are used in local/dev deployments; `SESSION_API_KEY` and `RUNTIME_URL` are used in cloud deployments. Always read both with `.get()` — see the code examples above.
+> **Note:** `OH_SESSION_API_KEYS_0` is used in local/dev deployments; `SESSION_API_KEY` is used in cloud deployments. Always read both with `.get()` — see the code examples above.
 
 **Note:** The automation framework automatically handles run completion callbacks.
 
@@ -341,19 +341,19 @@ import os
 import json
 
 from openhands.sdk import Conversation
+from openhands.sdk.workspace import RemoteWorkspace
 from openhands.tools.preset.default import get_default_agent
-from openhands.workspace import OpenHandsCloudWorkspace
 
 payload = json.loads(os.environ.get('AUTOMATION_EVENT_PAYLOAD', '{}'))
 print(f"Running: {payload.get('automation_name')}")
 
 api_key = os.environ.get("SESSION_API_KEY") or os.environ.get("OH_SESSION_API_KEYS_0", "")
-api_url = os.environ.get("RUNTIME_URL") or os.environ.get("OH_INTERNAL_SERVER_URL", "")
+host = os.environ.get("OH_INTERNAL_SERVER_URL", "http://localhost:60000")
 
-with OpenHandsCloudWorkspace(
-    local_agent_server_mode=True,
-    cloud_api_url=api_url,
-    cloud_api_key=api_key,
+with RemoteWorkspace(
+    host=host,
+    api_key=api_key,
+    working_dir="/workspace",
 ) as workspace:
     llm = workspace.get_llm()
     agent = get_default_agent(llm=llm, cli_mode=True)
