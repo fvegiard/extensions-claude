@@ -56,14 +56,14 @@ The agent server typically runs inside a **sandbox** (a Docker or Kubernetes con
 
 ### No-LLM Script Helpers
 
-When building a deterministic custom script, these two stdlib-only functions are required. Copy them verbatim — they handle both local/dev (`OH_INTERNAL_SERVER_URL`, `OH_SESSION_API_KEYS_0`) and cloud (`AGENT_SERVER_URL`, `SESSION_API_KEY`) deployments.
+When building a deterministic custom script, these two stdlib-only functions are required. Copy them verbatim — they use `AGENT_SERVER_URL` and `SESSION_API_KEY` injected by the automation service.
 
 ```python
 import json, os, urllib.request
 
 def get_secret(name):
     """Fetch a named secret stored in the agent server."""
-    url = (os.environ.get("OH_INTERNAL_SERVER_URL") or os.environ.get("AGENT_SERVER_URL", "")).rstrip("/")
+    url = os.environ.get("AGENT_SERVER_URL", "").rstrip("/")
     key = os.environ.get("SESSION_API_KEY") or os.environ.get("OH_SESSION_API_KEYS_0", "")
     with urllib.request.urlopen(urllib.request.Request(
         f"{url}/api/settings/secrets/{name}", headers={"X-Session-API-Key": key}
