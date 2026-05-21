@@ -405,7 +405,7 @@ For tasks that don't need AI reasoning — sending a Slack message, calling an A
 import os, urllib.request
 
 def get_secret(name: str) -> str:
-    url = os.environ.get("AGENT_SERVER_URL", "").rstrip("/")
+    url = (os.environ.get("OH_INTERNAL_SERVER_URL") or os.environ.get("AGENT_SERVER_URL", "")).rstrip("/")
     key = os.environ.get("SESSION_API_KEY") or os.environ.get("OH_SESSION_API_KEYS_0", "")
     req = urllib.request.Request(
         f"{url}/api/settings/secrets/{name}",
@@ -483,7 +483,7 @@ QUOTES = ["Stay hungry, stay foolish.", "Done is better than perfect."]
 CHANNEL = "C12345678"
 
 def get_secret(name):
-    url = os.environ.get("AGENT_SERVER_URL", "").rstrip("/")
+    url = (os.environ.get("OH_INTERNAL_SERVER_URL") or os.environ.get("AGENT_SERVER_URL", "")).rstrip("/")
     key = os.environ.get("SESSION_API_KEY") or os.environ.get("OH_SESSION_API_KEYS_0", "")
     req = urllib.request.Request(f"{url}/api/settings/secrets/{name}",
         headers={"X-Session-API-Key": key})

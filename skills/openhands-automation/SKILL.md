@@ -34,7 +34,15 @@ The agent server typically runs inside a **sandbox** (a Docker or Kubernetes con
 
 > **⚠️ CRITICAL — Agent behavior rules:**
 >
-> 0. **Does this task need an LLM at all? Check first.** Before picking a preset, ask whether the task actually requires reasoning, judgment, summarization, or open-ended tool use. If it is fully deterministic — fixed data transforms, scheduled HTTP calls, healthcheck pings, file rotation, picking from a known list, posting a templated message — an LLM-driven preset is overkill. Every run will spin up a sandbox and consume LLM tokens, which adds up fast at high frequencies (every 5 min ≈ 288 runs/day). Surface the trade-off to the user and offer the custom-script path (see `references/custom-automation.md`) as the cheaper, more reliable option. Be especially careful for cron schedules tighter than hourly.
+> 0. **Does this task need an LLM at all? Check first.** Before picking a preset, ask whether the task actually requires reasoning, judgment, summarization, or open-ended tool use. If it is fully deterministic — fixed data transforms, scheduled HTTP calls, healthcheck pings, file rotation, picking from a known list, posting a templated message — an LLM-driven preset is overkill. Every run will consume LLM tokens, which adds up fast at high frequencies (every 5 min ≈ 288 runs/day). Surface the trade-off to the user and offer the custom-script path (see `references/custom-automation.md`) as the cheaper, more reliable option. Be especially careful for cron schedules tighter than hourly.
+>
+>    **Instant-recognition patterns — these are always deterministic, never use an LLM preset:**
+>    - "post a quote / message / fact every N minutes" (rotating from a list)
+>    - "send a scheduled reminder / standup / digest"
+>    - "ping a health-check URL on a schedule"
+>    - "post to Slack / webhook every N minutes"
+>    - Any task where the full output could be written as a static template right now
+>
 > 1. **For LLM-appropriate work, default to preset endpoints.** They handle all SDK boilerplate, tarball packaging, and upload automatically:
 >    - **Prompt preset** (`POST /v1/preset/prompt`) — for tasks expressed as a natural language prompt that benefit from agent reasoning
 >    - **Plugin preset** (`POST /v1/preset/plugin`) — when plugins with skills, MCP configs, or commands are needed
@@ -45,6 +53,40 @@ The agent server typically runs inside a **sandbox** (a Docker or Kubernetes con
 >    - **Custom script** — full control over code, with or without LLM; point them to `references/custom-automation.md`
 >    - Let the user choose which approach to use.
 > 4. **Only create custom scripts after the user agrees to that path.** Refer to `references/custom-automation.md` for the full reference.
+
+### No-LLM Script Helpers
+
+When building a deterministic custom script, these two stdlib-only functions are required. Copy them verbatim — they handle both local/dev (`OH_INTERNAL_SERVER_URL`, `OH_SESSION_API_KEYS_0`) and cloud (`AGENT_SERVER_URL`, `SESSION_API_KEY`) deployments.
+
+```python
+import json, os, urllib.request
+
+def get_secret(name):
+    """Fetch a named secret stored in the agent server."""
+    url = (os.environ.get("OH_INTERNAL_SERVER_URL") or os.environ.get("AGENT_SERVER_URL", "")).rstrip("/")
+    key = os.environ.get("SESSION_API_KEY") or os.environ.get("OH_SESSION_API_KEYS_0", "")
+    with urllib.request.urlopen(urllib.request.Request(
+        f"{url}/api/settings/secrets/{name}", headers={"X-Session-API-Key": key}
+    )) as r:
+        return r.read().decode().strip()
+
+def fire_callback(status="COMPLETED", error=None):
+    """Signal run completion. MUST be called on every exit path — success AND error."""
+    url = os.environ.get("AUTOMATION_CALLBACK_URL", "")
+    if not url: return
+    body = {"status": status, "run_id": os.environ.get("AUTOMATION_RUN_ID", "")}
+    if error: body["error"] = error
+    try:
+        urllib.request.urlopen(urllib.request.Request(url, data=json.dumps(body).encode(), headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {os.environ.get('AUTOMATION_CALLBACK_API_KEY', '')}",
+        }))
+    except Exception as e: print(f"Callback error: {e}")
+```
+
+Entrypoint must be `python3 main.py` (no `setup.sh` needed). Wrap your main logic in `try/except` and call `fire_callback("FAILED", str(e))` in the except block.
+
+---
 
 ## Authentication
 
