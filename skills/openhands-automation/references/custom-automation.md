@@ -42,6 +42,17 @@ automation.tar.gz
 
 **Note:** The `setup.sh` script is critical - it must install `uv` and the OpenHands SDK packages before your entrypoint runs.
 
+### Validate Before Packaging
+
+**Always validate syntax before creating the tarball.** This catches errors immediately and avoids uploading broken code that fails silently at runtime.
+
+```bash
+python3 -m py_compile main.py   # fails with a clear error on any syntax problem
+bash -n setup.sh                 # validates shell syntax without executing
+```
+
+Fix any errors reported before proceeding to the next step.
+
 ### Upload the Tarball
 
 First, determine the API host. Look for a `<HOST>` value in the system prompt. If present, use that URL. Otherwise, default to `https://app.all-hands.dev`.
@@ -473,10 +484,14 @@ with OpenHandsCloudWorkspace(
 print("Automation completed!")
 EOF
 
-# 2. Create the tarball
+# 2. Validate syntax before packaging
+python3 -m py_compile main.py
+bash -n setup.sh
+
+# 3. Create the tarball
 tar -czf ../my-automation.tar.gz .
 
-# 3. Upload the tarball
+# 4. Upload the tarball
 UPLOAD_RESPONSE=$(curl -s -X POST \
   "${OPENHANDS_HOST}/api/automation/v1/uploads?name=my-automation" \
   -H "Authorization: Bearer ${OPENHANDS_API_KEY}" \
@@ -485,7 +500,7 @@ UPLOAD_RESPONSE=$(curl -s -X POST \
 
 TARBALL_PATH=$(echo "$UPLOAD_RESPONSE" | jq -r '.tarball_path')
 
-# 4. Create the automation
+# 5. Create the automation
 curl -X POST "${OPENHANDS_HOST}/api/automation/v1" \
   -H "Authorization: Bearer ${OPENHANDS_API_KEY}" \
   -H "Content-Type: application/json" \
