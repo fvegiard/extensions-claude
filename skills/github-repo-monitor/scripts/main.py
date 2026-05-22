@@ -130,8 +130,11 @@ def _default_since() -> str:
 
 def load_state(path: str) -> dict:
     if os.path.exists(path):
-        with open(path) as f:
-            return json.load(f)
+        try:
+            with open(path) as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError) as exc:
+            print(f"Warning: state file {path} unreadable ({exc}); starting fresh")
     return {
         "version": 1,
         "repo": REPO,
@@ -407,6 +410,21 @@ def conversation_final_response(agent_url: str, api_key: str, conv_id: str) -> s
     return result.get("response", "")
 
 
+# ── Comment filtering helpers ─────────────────────────────────────────────────
+
+def _is_bot_comment(comment: dict) -> bool:
+    """Return True if the comment was posted by a bot account."""
+    user = comment.get("user") or {}
+    login = user.get("login", "")
+    return login.endswith("[bot]") or user.get("type") == "Bot"
+
+
+def _has_trigger(comment: dict, phrase: str) -> bool:
+    """Return True if the comment body contains *phrase* (case-insensitive)."""
+    body = (comment.get("body") or "").strip()
+    return phrase.lower() in body.lower()
+
+
 # ── Prompt building ────────────────────────────────────────────────────────────
 
 def _build_initial_prompt(ctx: dict, trigger_comment: dict, event_type: str) -> str:
@@ -461,6 +479,82 @@ def _build_initial_prompt(ctx: dict, trigger_comment: dict, event_type: str) -> 
 
 # ── Core event processing ──────────────────────────────────────────────────────
 
+def _ensure_conversation(
+    agent_url: str,
+    api_key: str,
+    conversations: dict[str, dict],
+    conv_key: str,
+    issue_number: int,
+    is_pr: bool,
+    html_url: str,
+    prompt: str,
+    comment: dict,
+    item_type: str,
+) -> tuple[str, bool]:
+    """Create a new conversation or re-open a closed one.
+
+    Returns ``(conv_id, resumed)`` where *resumed* is True when an existing
+    closed conversation was successfully re-activated.
+    Raises on unrecoverable errors so the caller can log and skip.
+    """
+    existing = conversations.get(conv_key)
+
+    if existing and existing.get("status") == "closed":
+        conv_id = existing["conversation_id"]
+        author = (comment.get("user") or {}).get("login", "?")
+        body_text = (comment.get("body") or "").strip()
+        try:
+            send_to_conversation(
+                agent_url, api_key, conv_id,
+                f"New request on GitHub {item_type} #{issue_number} by @{author}:\n\n{body_text}",
+            )
+            existing["status"] = "active"
+            existing["last_activity"] = time.time()
+            print(f"  Re-opened closed conversation {conv_id}")
+            return conv_id, True
+        except Exception as exc:
+            print(f"  Closed conversation {conv_id} unreachable ({exc}) — creating new")
+
+    conv_id = create_conversation(agent_url, api_key, prompt)
+    conversations[conv_key] = {
+        "conversation_id": conv_id,
+        "issue_number": issue_number,
+        "issue_type": "pr" if is_pr else "issue",
+        "html_url": html_url,
+        "status": "active",
+        "last_activity": time.time(),
+    }
+    print(f"  Created conversation {conv_id}")
+    return conv_id, False
+
+
+def _post_acknowledgement(
+    github_token: str,
+    repo: str,
+    issue_number: int,
+    item_type: str,
+    conv_url: str,
+    resumed: bool,
+) -> None:
+    """Post an acknowledgement comment on the GitHub issue or PR."""
+    if resumed:
+        body = (
+            f"🤖 **OpenHands is resuming work on this {item_type}.**\n\n"
+            f"Picking up the existing conversation: {conv_url}\n\n"
+            f"_This comment was posted by an AI agent (OpenHands) "
+            f"in response to a '{TRIGGER_PHRASE}' mention._"
+        )
+    else:
+        body = (
+            f"🤖 **OpenHands is on it!**\n\n"
+            f"I've started working on this {item_type}. "
+            f"View the conversation here: {conv_url}\n\n"
+            f"_This comment was posted by an AI agent (OpenHands) "
+            f"in response to a '{TRIGGER_PHRASE}' mention._"
+        )
+    _post_github_comment(github_token, repo, issue_number, body)
+
+
 def _process_trigger_comment(
     github_token: str,
     agent_url: str,
@@ -506,65 +600,19 @@ def _process_trigger_comment(
             print(f"  Warning: could not forward to conversation {conv_id}: {exc} — creating new")
             # Fall through to create a new conversation.
 
-    # ── Case B: closed or missing conversation — create / re-open ─────────────
+    # ── Case B: closed or missing — create / re-open via helper ──────────────
     prompt = _build_initial_prompt(ctx, comment, event_type)
-    resumed = False
-
-    # If there's a closed conversation, try to re-open it by sending a message.
-    if existing and existing.get("status") == "closed":
-        conv_id = existing["conversation_id"]
-        author = comment.get("user", {}).get("login", "?")
-        body_text = (comment.get("body") or "").strip()
-        try:
-            send_to_conversation(
-                agent_url, api_key, conv_id,
-                f"New request on GitHub {item_type} #{issue_number} by @{author}:\n\n{body_text}",
-            )
-            existing["status"] = "active"
-            existing["last_activity"] = time.time()
-            conv_id_used = conv_id
-            resumed = True
-            print(f"  Re-opened closed conversation {conv_id}")
-        except Exception as exc:
-            print(f"  Closed conversation {conv_id} unreachable ({exc}) — creating new")
-            existing = None  # fall through to create fresh
-
-    if existing is None or existing.get("status") not in ("active", "closed"):
-        # Create a brand-new conversation.
-        try:
-            conv_id_used = create_conversation(agent_url, api_key, prompt)
-            conversations[conv_key] = {
-                "conversation_id": conv_id_used,
-                "issue_number": issue_number,
-                "issue_type": "pr" if is_pr else "issue",
-                "html_url": html_url,
-                "status": "active",
-                "last_activity": time.time(),
-            }
-            print(f"  Created conversation {conv_id_used}")
-        except Exception as exc:
-            print(f"  Error creating conversation for #{issue_number}: {exc}")
-            return
-
-    conv_url = f"{openhands_url}/conversations/{conv_id_used}"
-
-    # Post acknowledgement comment on GitHub.
-    if resumed:
-        ack_body = (
-            f"🤖 **OpenHands is resuming work on this {item_type}.**\n\n"
-            f"Picking up the existing conversation: {conv_url}\n\n"
-            f"_This comment was posted by an AI agent (OpenHands) "
-            f"in response to a '{TRIGGER_PHRASE}' mention._"
+    try:
+        conv_id, resumed = _ensure_conversation(
+            agent_url, api_key, conversations, conv_key,
+            issue_number, is_pr, html_url, prompt, comment, item_type,
         )
-    else:
-        ack_body = (
-            f"🤖 **OpenHands is on it!**\n\n"
-            f"I've started working on this {item_type}. "
-            f"View the conversation here: {conv_url}\n\n"
-            f"_This comment was posted by an AI agent (OpenHands) "
-            f"in response to a '{TRIGGER_PHRASE}' mention._"
-        )
-    _post_github_comment(github_token, repo, issue_number, ack_body)
+    except Exception as exc:
+        print(f"  Error creating conversation for #{issue_number}: {exc}")
+        return
+
+    conv_url = f"{openhands_url}/conversations/{conv_id}"
+    _post_acknowledgement(github_token, repo, issue_number, item_type, conv_url, resumed)
 
 
 def _check_conversation_completion(
@@ -676,15 +724,11 @@ def main() -> None:
         if comment_id in processed_set:
             continue
 
-        author_login = (comment.get("user") or {}).get("login", "")
-        # Skip comments made by bots to avoid feedback loops.
-        if author_login.endswith("[bot]") or (comment.get("user") or {}).get("type") == "Bot":
+        if _is_bot_comment(comment):
             processed_set.add(comment_id)
             continue
 
-        body_text: str = (comment.get("body") or "").strip()
-        if TRIGGER_PHRASE.lower() not in body_text.lower():
-            # Not a trigger comment — mark as seen but don't process.
+        if not _has_trigger(comment, TRIGGER_PHRASE):
             processed_set.add(comment_id)
             continue
 
@@ -719,11 +763,12 @@ def main() -> None:
     print(f"State saved → {state_path}")
 
 
-try:
-    main()
-    fire_callback("COMPLETED")
-except Exception as exc:
-    import traceback
-    traceback.print_exc()
-    fire_callback("FAILED", str(exc))
-    sys.exit(1)
+if __name__ == "__main__":
+    try:
+        main()
+        fire_callback("COMPLETED")
+    except Exception as exc:
+        import traceback
+        traceback.print_exc()
+        fire_callback("FAILED", str(exc))
+        sys.exit(1)
