@@ -299,5 +299,46 @@ class TestPostAcknowledgement(unittest.TestCase):
             main.TRIGGER_PHRASE = original
 
 
+# ── _get_agent_dict tests ──────────────────────────────────────────────────────
+
+class TestGetAgentDict(unittest.TestCase):
+    """Regression tests for agent-name resolution from /api/settings."""
+
+    def _mock_settings(self, agent_value, llm_value=None):
+        """Return a mock urlopen context manager that yields the given settings."""
+        payload = json.dumps({
+            "agent_settings": {"agent": agent_value, "llm": llm_value or {}}
+        }).encode()
+        mock_resp = MagicMock()
+        mock_resp.__enter__ = MagicMock(return_value=mock_resp)
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        mock_resp.read = MagicMock(return_value=payload)
+        return mock_resp
+
+    @patch("urllib.request.urlopen")
+    def test_null_agent_falls_back_to_codeactagent(self, mock_urlopen):
+        """agent=null in settings must not propagate as kind=null (regression for 500 error)."""
+        mock_urlopen.return_value = self._mock_settings(agent_value=None)
+        result = main._get_agent_dict("http://agent", "key")
+        self.assertEqual(result["kind"], "CodeActAgent")
+
+    @patch("urllib.request.urlopen")
+    def test_explicit_agent_name_is_used(self, mock_urlopen):
+        mock_urlopen.return_value = self._mock_settings(agent_value="BrowsingAgent")
+        result = main._get_agent_dict("http://agent", "key")
+        self.assertEqual(result["kind"], "BrowsingAgent")
+
+    @patch("urllib.request.urlopen")
+    def test_missing_agent_key_falls_back_to_codeactagent(self, mock_urlopen):
+        payload = json.dumps({"agent_settings": {"llm": {}}}).encode()
+        mock_resp = MagicMock()
+        mock_resp.__enter__ = MagicMock(return_value=mock_resp)
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        mock_resp.read = MagicMock(return_value=payload)
+        mock_urlopen.return_value = mock_resp
+        result = main._get_agent_dict("http://agent", "key")
+        self.assertEqual(result["kind"], "CodeActAgent")
+
+
 if __name__ == "__main__":
     unittest.main()
