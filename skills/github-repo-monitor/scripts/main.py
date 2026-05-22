@@ -29,6 +29,7 @@ Optional secret:
 import json
 import os
 import sys
+from pathlib import Path
 import time
 import urllib.error
 import urllib.request
@@ -111,13 +112,13 @@ def _state_file_path() -> str:
     automation_id = event_payload.get("automation_id", "default")
 
     if workspace_base:
-        root = os.path.dirname(os.path.dirname(os.path.abspath(workspace_base)))
+        root = Path(workspace_base).resolve().parent.parent
     else:
-        root = os.path.expanduser("~/.openhands/workspaces")
+        root = Path.home() / ".openhands" / "workspaces"
 
-    state_dir = os.path.join(root, "automation-state")
-    os.makedirs(state_dir, exist_ok=True)
-    return os.path.join(state_dir, f"github_poller_{automation_id}.json")
+    state_dir = root / "automation-state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    return str(state_dir / f"github_poller_{automation_id}.json")
 
 
 def _default_since() -> str:
@@ -507,6 +508,7 @@ def _process_trigger_comment(
 
     # ── Case B: closed or missing conversation — create / re-open ─────────────
     prompt = _build_initial_prompt(ctx, comment, event_type)
+    resumed = False
 
     # If there's a closed conversation, try to re-open it by sending a message.
     if existing and existing.get("status") == "closed":
@@ -521,6 +523,7 @@ def _process_trigger_comment(
             existing["status"] = "active"
             existing["last_activity"] = time.time()
             conv_id_used = conv_id
+            resumed = True
             print(f"  Re-opened closed conversation {conv_id}")
         except Exception as exc:
             print(f"  Closed conversation {conv_id} unreachable ({exc}) — creating new")
@@ -546,13 +549,21 @@ def _process_trigger_comment(
     conv_url = f"{openhands_url}/conversations/{conv_id_used}"
 
     # Post acknowledgement comment on GitHub.
-    ack_body = (
-        f"🤖 **OpenHands is on it!**\n\n"
-        f"I've started working on this {item_type}. "
-        f"View the conversation here: {conv_url}\n\n"
-        f"_This comment was posted by an AI agent (OpenHands) "
-        f"in response to a '{TRIGGER_PHRASE}' mention._"
-    )
+    if resumed:
+        ack_body = (
+            f"🤖 **OpenHands is resuming work on this {item_type}.**\n\n"
+            f"Picking up the existing conversation: {conv_url}\n\n"
+            f"_This comment was posted by an AI agent (OpenHands) "
+            f"in response to a '{TRIGGER_PHRASE}' mention._"
+        )
+    else:
+        ack_body = (
+            f"🤖 **OpenHands is on it!**\n\n"
+            f"I've started working on this {item_type}. "
+            f"View the conversation here: {conv_url}\n\n"
+            f"_This comment was posted by an AI agent (OpenHands) "
+            f"in response to a '{TRIGGER_PHRASE}' mention._"
+        )
     _post_github_comment(github_token, repo, issue_number, ack_body)
 
 
