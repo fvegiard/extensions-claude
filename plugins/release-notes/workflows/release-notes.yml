@@ -38,11 +38,15 @@ jobs:
 
             - name: Determine tag
               id: get-tag
+              env:
+                GITHUB_EVENT_NAME: ${{ github.event_name }}
+                GITHUB_EVENT_INPUTS_TAG: ${{ github.event.inputs.tag }}
+                GITHUB_REF_NAME: ${{ github.ref_name }}
               run: |
-                  if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-                    echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+                  if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+                    echo "tag=$GITHUB_EVENT_INPUTS_TAG" >> $GITHUB_OUTPUT
                   else
-                    echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+                    echo "tag=$GITHUB_REF_NAME" >> $GITHUB_OUTPUT
                   fi
 
             - name: Generate Release Notes
@@ -57,13 +61,19 @@ jobs:
                   github-token: ${{ secrets.GITHUB_TOKEN }}
 
             - name: Display generated notes
+              env:
+                STEPS_GET_TAG_OUTPUTS_TAG: ${{ steps.get-tag.outputs.tag }}
+                STEPS_RELEASE_NOTES_OUTPUTS_PREVIOUS_TAG: ${{ steps.release-notes.outputs.previous-tag }}
+                STEPS_RELEASE_NOTES_OUTPUTS_COMMIT_COUNT: ${{ steps.release-notes.outputs.commit-count }}
+                STEPS_RELEASE_NOTES_OUTPUTS_CONTRIBUTOR_COUNT: ${{ steps.release-notes.outputs.contributor-count }}
+                STEPS_RELEASE_NOTES_OUTPUTS_NEW_CONTRIBUTOR_COUNT: ${{ steps.release-notes.outputs.new-contributor-count }}
               run: |
-                  echo "## Release Notes for ${{ steps.get-tag.outputs.tag }}"
+                  echo "## Release Notes for $STEPS_GET_TAG_OUTPUTS_TAG"
                   echo ""
-                  echo "Previous tag: ${{ steps.release-notes.outputs.previous-tag }}"
-                  echo "Commits: ${{ steps.release-notes.outputs.commit-count }}"
-                  echo "Contributors: ${{ steps.release-notes.outputs.contributor-count }}"
-                  echo "New contributors: ${{ steps.release-notes.outputs.new-contributor-count }}"
+                  echo "Previous tag: $STEPS_RELEASE_NOTES_OUTPUTS_PREVIOUS_TAG"
+                  echo "Commits: $STEPS_RELEASE_NOTES_OUTPUTS_COMMIT_COUNT"
+                  echo "Contributors: $STEPS_RELEASE_NOTES_OUTPUTS_CONTRIBUTOR_COUNT"
+                  echo "New contributors: $STEPS_RELEASE_NOTES_OUTPUTS_NEW_CONTRIBUTOR_COUNT"
                   echo ""
                   echo "---"
                   cat release_notes.md
